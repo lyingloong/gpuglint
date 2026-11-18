@@ -41,11 +41,11 @@ func (p *patterns) Set(s string) error {
 }
 
 type options struct {
-	command, config, path, order string
-	include, exclude             patterns
-	interval, timeout            time.Duration
-	concurrency                  int
-	json, headless, follow       bool
+	command, config, path, order       string
+	include, exclude                   patterns
+	interval, timeout                  time.Duration
+	concurrency                        int
+	json, headless, follow, errorsOnly bool
 }
 
 func expandHome(s string) (string, error) {
@@ -85,13 +85,16 @@ func parse(args []string, stderr io.Writer) (options, error) {
 		fs.StringVar(&o.path, "state-file", "~/.ssh/.gpuglint/state", "live JSON state file")
 	}
 	if o.command != "hosts" {
-		fs.StringVar(&o.order, "sort", "host", "row order: host or free (most free memory first)")
+		fs.StringVar(&o.order, "sort", "host", "host order: host or free (most free memory on one GPU first)")
 	}
 	if o.command != "watch" {
 		fs.BoolVar(&o.json, "json", false, "write machine-readable JSON to stdout")
 	}
 	if o.command == "status" {
 		fs.BoolVar(&o.follow, "follow", false, "view the running monitor's dashboard until it stops")
+	}
+	if o.command == "scan" || o.command == "status" {
+		fs.BoolVar(&o.errorsOnly, "errors", false, "show diagnostic details for failed hosts")
 	}
 	if err := fs.Parse(args[1:]); err != nil {
 		return o, err
@@ -101,6 +104,9 @@ func parse(args []string, stderr io.Writer) (options, error) {
 	}
 	if o.follow && o.json {
 		return o, errors.New("use --follow for a dashboard or --json for a snapshot")
+	}
+	if o.errorsOnly && (o.json || o.follow) {
+		return o, errors.New("--errors is a standalone text view; use it without --json or --follow")
 	}
 	if o.order != "" && o.order != "host" && o.order != "free" {
 		return o, errors.New("--sort must be host or free")

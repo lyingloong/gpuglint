@@ -4,10 +4,10 @@
 
 ## 开始使用
 
-从 [GitHub Releases](https://github.com/lyingloong/gpuglint/releases) 下载对应系统和架构的程序，Windows 上命名为 `gpuglint.exe`，Linux 上命名为 `gpuglint` 并运行 `chmod +x gpuglint`。将它放在 PATH 中，或者用 `.\gpuglint.exe`、`./gpuglint` 启动。已有 Go 1.23 或更新版本也可以从源码安装。
+使用 Go 1.23 或更新版本从主分支安装。把 Go 的二进制安装目录加入 PATH 后，即可在终端运行 `gpuglint`。
 
 ```sh
-go install github.com/lyingloong/gpuglint@latest
+go install github.com/lyingloong/gpuglint@main
 ```
 
 ```sh
@@ -15,7 +15,11 @@ gpuglint hosts
 gpuglint watch --host "train-*" --interval 15s
 ```
 
-默认选择所有具名主机，每 30 秒采样，最多同时轮询 4 台，每台的连接和后端回退共用 20 秒超时。面板展示每块卡的型号、负载、显存（GiB）、温度和上次成功采样的年龄。`--sort free` 将剩余显存最多的卡排在前面，过期和显存未知的记录排在最后。同一主机最多有一次正在进行的采集。
+默认选择所有具名主机，每 30 秒采样，最多同时轮询 4 台。每台机器的 SSH 连接和后端回退共用 20 秒超时，同一主机的采集按顺序执行。
+
+面板每台主机占一行。宽屏显示 GPU 数量与型号、负载、单卡最大剩余显存（GiB）、最高温度和上次成功采集距今多久。`LOAD / PEAK` 中的小柱按 GPU 编号排列，每根柱表示一张卡的利用率，右侧百分比是最高值。`?` 表示该卡利用率未知。`--sort free` 按单卡最大剩余显存从多到少排列主机，失联、数据过期或显存未知的主机排在后面。逐卡指标可用 `gpuglint status --json` 读取。
+
+窗口变窄时，面板优先保留主机名和状态。高度不足时，底部会提示有多少台主机未显示，运行 `gpuglint status` 可列出全部主机。采集失败时，主机所在行会显示简短原因，例如认证失败或连接超时。运行 `gpuglint status --errors` 可查看错误详情，单次采集也可以用 `gpuglint scan --host gpu-01 --errors`。
 
 ## 命令
 
@@ -72,7 +76,7 @@ gpuglint status --json | jq -r '
   | [$host, .index, (.memory_total_mib - .memory_used_mib)] | @tsv'
 ```
 
-JSON 写入 stdout，诊断写入 stderr。退出码 `0` 表示命令成功；`1` 表示参数、配置或运行时错误；`2` 表示单次 `scan` 中至少一台主机采集失败，此时 stdout 仍包含完整快照；`3` 表示 `status` 找不到活跃的采集进程。`status` 成功读取快照时返回 `0`，agent 可以逐台检查主机状态。
+命令结果写入 stdout，程序自身的运行错误写入 stderr。退出码 `0` 表示成功，`1` 表示参数、配置或运行时错误，`2` 表示单次采集中至少一台主机失败，`3` 表示找不到活跃的采集进程。部分主机失败时，`scan --json` 仍返回完整快照，`scan --errors` 只列出失败主机及其诊断。`status` 成功读取快照时返回 `0`，agent 可以逐台检查主机状态。
 
 ## 开发
 
@@ -82,4 +86,4 @@ go vet ./...
 go build .
 ```
 
-CI 在 Windows 和 Linux 上运行测试，并构建 amd64 和 arm64 单文件程序。以 `v` 开头的版本标签触发 GitHub Release，提供各平台程序及 SHA-256 校验文件。
+CI 在 Windows 和 Linux 上运行测试，并构建两个系统的 amd64 和 arm64 单文件程序。需要预编译版本时，登录 GitHub，在主分支一次成功的构建记录下下载 `gpuglint-binaries` 附件。解压后选择对应系统和架构的文件，Windows 上命名为 `gpuglint.exe`，Linux 上命名为 `gpuglint` 并运行 `chmod +x gpuglint`。[查看构建记录](https://github.com/lyingloong/gpuglint/actions/workflows/build.yml?query=branch%3Amain)

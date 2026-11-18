@@ -3,9 +3,29 @@ package main
 import (
 	"os"
 	"syscall"
+	"unsafe"
 )
 
-var setConsoleMode = syscall.NewLazyDLL("kernel32.dll").NewProc("SetConsoleMode")
+var (
+	kernel32                   = syscall.NewLazyDLL("kernel32.dll")
+	setConsoleMode             = kernel32.NewProc("SetConsoleMode")
+	getConsoleScreenBufferInfo = kernel32.NewProc("GetConsoleScreenBufferInfo")
+)
+
+func terminalSize(f *os.File) (width, height int) {
+	// srWindow is an inclusive rectangle inside the larger screen buffer.
+	var info struct {
+		Size, CursorPosition [2]int16
+		Attributes           uint16
+		Window               struct{ Left, Top, Right, Bottom int16 }
+		MaximumWindowSize    [2]int16
+	}
+	ok, _, _ := getConsoleScreenBufferInfo.Call(f.Fd(), uintptr(unsafe.Pointer(&info)))
+	if ok == 0 {
+		return 0, 0
+	}
+	return int(info.Window.Right) - int(info.Window.Left) + 1, int(info.Window.Bottom) - int(info.Window.Top) + 1
+}
 
 func terminalMode(f *os.File) (bool, func()) {
 	var mode uint32

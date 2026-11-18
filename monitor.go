@@ -143,6 +143,9 @@ func scan(ctx context.Context, out io.Writer, o options, names []string, poll po
 	if o.json {
 		return code, writeJSON(out, s)
 	}
+	if o.errorsOnly {
+		return code, displayErrors(out, s)
+	}
 	return code, drawTable(out, s, o.order)
 }
 
