@@ -9,6 +9,80 @@ import (
 )
 
 var lockFileEx = syscall.NewLazyDLL("kernel32.dll").NewProc("LockFileEx")
+var setFileInformationByHandle = syscall.NewLazyDLL("kernel32.dll").NewProc("SetFileInformationByHandle")
+
+// Use POSIX rename/unlink semantics on local filesystems that support them.
+// MoveFileEx(REPLACE_EXISTING) can deny even an open FILE_SHARE_DELETE
+// reader. A POSIX rename preserves its handle to the previous snapshot.
+func replaceFile(src, dst string) error {
+	const fileRenameInfoEx = 22
+	const replaceIfExists = 1
+	const posixSemantics = 2
+	type renameInfo struct {
+		Flags          uint32
+		RootDirectory  uintptr
+		FileNameLength uint32
+		FileName       [1]uint16
+	}
+	name, err := syscall.UTF16FromString(dst)
+	if err != nil {
+		return err
+	}
+	// FILE_RENAME_INFO ends in an inline, variable-length UTF-16 name.
+	var header renameInfo
+	buf := make([]byte, int(unsafe.Sizeof(header))+len(name)*2)
+	info := (*renameInfo)(unsafe.Pointer(&buf[0]))
+	info.Flags = replaceIfExists | posixSemantics
+	info.FileNameLength = uint32((len(name) - 1) * 2)
+	copy(unsafe.Slice(&info.FileName[0], len(name)), name)
+	err = changeFileInfo(src, fileRenameInfoEx, buf)
+	if unsupportedInfo(err) {
+		return os.Rename(src, dst)
+	}
+	if err != nil {
+		return &os.LinkError{Op: "rename", Old: src, New: dst, Err: err}
+	}
+	return nil
+}
+
+func unlinkFile(path string) error {
+	const fileDispositionInfoEx = 21
+	const dispositionDelete = 1
+	const posixSemantics = 2
+	err := changeFileInfo(path, fileDispositionInfoEx, []byte{dispositionDelete | posixSemantics, 0, 0, 0})
+	if unsupportedInfo(err) {
+		return os.Remove(path)
+	}
+	if err != nil {
+		return &os.PathError{Op: "remove", Path: path, Err: err}
+	}
+	return nil
+}
+
+func changeFileInfo(path string, class uintptr, buf []byte) error {
+	const deleteAccess = 0x00010000
+	name, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	h, err := syscall.CreateFile(name, deleteAccess, syscall.FILE_SHARE_READ|syscall.FILE_SHARE_WRITE|syscall.FILE_SHARE_DELETE,
+		nil, syscall.OPEN_EXISTING, syscall.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if err != nil {
+		return err
+	}
+	defer syscall.CloseHandle(h)
+	ok, _, callErr := setFileInformationByHandle.Call(uintptr(h), class, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+	runtime.KeepAlive(buf)
+	if ok == 0 {
+		return callErr
+	}
+	return nil
+}
+
+func unsupportedInfo(err error) bool {
+	// ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED, ERROR_INVALID_PARAMETER.
+	return errors.Is(err, syscall.Errno(1)) || errors.Is(err, syscall.Errno(50)) || errors.Is(err, syscall.Errno(87))
+}
 
 // Share delete access so another process can replace a snapshot while
 // this handle is reading its previous contents.

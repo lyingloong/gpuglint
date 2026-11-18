@@ -50,6 +50,8 @@ gpuglint watch --host "train-*" --interval 15s
 
 按 Ctrl+C 或在 Linux 上发送 SIGTERM 后，采集进程删除自己写入的状态和锁文件，并清理本次新建且仍为空的状态目录。断电或强制结束进程可能留下文件；此时 `status` 会报告采集进程未运行，下次启动会回收旧状态。需要判断进程存活的 agent 应优先调用 `status --json`。
 
+Windows 上直接读文件的程序应在读取后关闭句柄，或使用允许删除共享的打开方式（`FILE_SHARE_DELETE`）。这样监控进程可以在读者工作时继续替换快照，也能在退出时清理文件。
+
 [JSON Schema](schema/state-v1.json) 描述了 `status --json`、`scan --json` 和状态文件共用的快照格式。时间戳使用 UTC；利用率单位为 %，显存为 MiB，温度为 °C。
 
 | 主机状态 | 含义 |

@@ -26,3 +26,6 @@ func tryLock(f *os.File, offset int64, exclusive bool) (bool, error) {
 }
 
 func sharingConflict(error) bool { return false }
+
+func replaceFile(src, dst string) error { return os.Rename(src, dst) }
+func unlinkFile(path string) error      { return os.Remove(path) }

@@ -45,7 +45,7 @@ func retrySharing(op func() error) error {
 }
 
 func remove(path string) error {
-	err := retrySharing(func() error { return os.Remove(path) })
+	err := retrySharing(func() error { return unlinkFile(path) })
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
@@ -210,7 +210,7 @@ func (w *Writer) Write(data []byte) error {
 	if err := errors.Join(writeErr, statErr, f.Close()); err != nil {
 		return err
 	}
-	if err := retrySharing(func() error { return os.Rename(tmp, w.path) }); err != nil {
+	if err := retrySharing(func() error { return replaceFile(tmp, w.path) }); err != nil {
 		return err
 	}
 	published = true
