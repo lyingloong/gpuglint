@@ -82,6 +82,13 @@ func TestDashboardUsesRowsBeforeDecorations(t *testing.T) {
 	}
 }
 
+func TestNarrowStatusKeepsTheFailureReason(t *testing.T) {
+	r := hostRow{status: "Unreachable (stale)"}
+	if got := r.cell(column{label: "STATUS", width: 14}); got != "Unreachable" {
+		t.Fatalf("narrow status = %q", got)
+	}
+}
+
 func TestErrorClasses(t *testing.T) {
 	for _, tc := range []struct{ code, message, want string }{
 		{"ssh_error", "Permission denied (publickey).", "Auth denied"},

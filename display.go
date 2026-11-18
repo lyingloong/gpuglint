@@ -331,6 +331,11 @@ func (r hostRow) cell(c column) string {
 		}
 		return r.alias
 	case "STATUS":
+		if len(r.status) > c.width {
+			// Metrics are already hidden for failed hosts. Keep the reason
+			// readable when the optional freshness qualifier will not fit.
+			return strings.TrimSuffix(r.status, " (stale)")
+		}
 		return r.status
 	case "GPUs":
 		if c.width > 4 {
