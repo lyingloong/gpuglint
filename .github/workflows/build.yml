@@ -1,0 +1,66 @@
+name: Test and build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: Build standalone executables
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir dist
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/gpuglint-linux-$arch" .
+            GOOS=windows GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/gpuglint-windows-$arch.exe" .
+          done
+          cd dist
+          sha256sum gpuglint-* > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpuglint-binaries
+          path: dist/
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: gpuglint-binaries
+          path: dist/
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "GPU Glint $RELEASE_TAG" --generate-notes dist/*

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GPU Glint snapshot v1",
+  "type": "object",
+  "required": ["schema_version", "started_at", "updated_at", "hosts"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "started_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "interval_seconds": { "type": "number", "exclusiveMinimum": 0 },
+    "hosts": { "type": "array", "items": { "$ref": "#/$defs/host" } }
+  },
+  "$defs": {
+    "optionalTime": { "type": ["string", "null"], "format": "date-time" },
+    "metric": { "type": ["number", "null"] },
+    "host": {
+      "type": "object",
+      "required": ["alias", "status", "last_attempt_at", "last_success_at", "fresh_until", "gpus", "error"],
+      "properties": {
+        "alias": { "type": "string" },
+        "status": { "enum": ["pending", "ok", "no_gpu", "error"] },
+        "last_attempt_at": { "$ref": "#/$defs/optionalTime" },
+        "last_success_at": { "$ref": "#/$defs/optionalTime" },
+        "fresh_until": { "$ref": "#/$defs/optionalTime" },
+        "backend": { "enum": ["nvitop", "nvtop", "nvidia-smi"] },
+        "gpus": { "type": "array", "items": { "$ref": "#/$defs/gpu" } },
+        "error": {
+          "type": ["object", "null"],
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        }
+      }
+    },
+    "gpu": {
+      "type": "object",
+      "required": ["index", "name", "utilization_pct", "memory_used_mib", "memory_total_mib", "temperature_c"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string" },
+        "uuid": { "type": "string" },
+        "utilization_pct": { "$ref": "#/$defs/metric" },
+        "memory_used_mib": { "$ref": "#/$defs/metric" },
+        "memory_total_mib": { "$ref": "#/$defs/metric" },
+        "temperature_c": { "$ref": "#/$defs/metric" }
+      }
+    }
+  }
+}
