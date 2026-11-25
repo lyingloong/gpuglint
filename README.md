@@ -4,16 +4,33 @@
 
 ## 开始使用
 
-使用 Go 1.23 或更新版本从主分支安装。把 Go 的二进制安装目录加入 PATH 后，即可在终端运行 `gpuglint`。
+下载与你的系统和处理器架构匹配的单文件程序。客户端无需安装 Go 或 Python。[GitHub Releases](https://github.com/lyingloong/gpuglint/releases)
+
+如果还没有正式版本，可以登录 GitHub，从主分支一次成功的构建记录下载 `gpuglint-binaries` 附件并解压。[查看构建记录](https://github.com/lyingloong/gpuglint/actions/workflows/build.yml?query=branch%3Amain)
+
+| 系统 | amd64（x86-64） | arm64（AArch64） |
+| --- | --- | --- |
+| Linux | `gpuglint-linux-amd64` | `gpuglint-linux-arm64` |
+| Windows | `gpuglint-windows-amd64.exe` | `gpuglint-windows-arm64.exe` |
+
+发布附件中的 `SHA256SUMS` 可用于校验下载的文件。在终端中进入下载目录，以下以 amd64 为例。
+
+**Linux**
 
 ```sh
-go install github.com/lyingloong/gpuglint@main
+chmod +x ./gpuglint-linux-amd64
+./gpuglint-linux-amd64 hosts
+./gpuglint-linux-amd64 watch --host "train-*" --interval 15s
 ```
 
-```sh
-gpuglint hosts
-gpuglint watch --host "train-*" --interval 15s
+**Windows PowerShell**
+
+```powershell
+.\gpuglint-windows-amd64.exe hosts
+.\gpuglint-windows-amd64.exe watch --host "train-*" --interval 15s
 ```
+
+如果希望直接使用下文的 `gpuglint` 命令，可以把下载的文件改名为 `gpuglint`（Windows 上为 `gpuglint.exe`），并放入 PATH 中的目录。
 
 默认选择所有具名主机，每 30 秒采样，最多同时轮询 4 台。每台机器的 SSH 连接和后端回退共用 20 秒超时，同一主机的采集按顺序执行。
 
@@ -38,7 +55,7 @@ gpuglint watch --host "train-*" --interval 15s
 
 默认从 `~/.ssh/config` 发现主机，`--ssh-config PATH` 可指定其他配置。发现器读取具名 `Host` 和 `Include` 文件，保留声明顺序。通配规则无法枚举具体机器，可以用 `--host gpu-07` 指定匹配该规则的目标。依赖运行时 `Match` 条件、主机专属路径变量或其他用户主目录的 Include 也可采用显式别名。相对 Include 路径以用户的 `~/.ssh` 为基准。
 
-实际连接由 PATH 中的 `ssh` 完成，读取已有的用户名、端口、密钥、跳板机和主机密钥配置。采集运行在非交互会话中；首次使用一台机器时，可先用相同别名手动登录，确认主机密钥和 SSH 认证可用。远端的非交互 PATH 需要能找到至少一个采集后端。
+实际连接由客户端 PATH 中的 `ssh` 完成，读取已有的用户名、端口、密钥、跳板机和主机密钥配置。采集运行在非交互会话中。首次使用一台机器时，可先用相同别名手动登录，确认主机密钥和 SSH 认证可用。GPU 主机无需部署 gpuglint。远端的非交互 PATH 需要能找到至少一个采集后端，其中 `nvtop` 和 `nvidia-smi` 均无需 Python。
 
 | 优先级 | 后端 | 数据来源 |
 | --- | --- | --- |
@@ -80,10 +97,18 @@ gpuglint status --json | jq -r '
 
 ## 开发
 
+使用 Go 1.23 或更新版本可以从主分支安装。把 Go 的二进制安装目录加入 PATH 后，即可运行 `gpuglint`。
+
+```sh
+go install github.com/lyingloong/gpuglint@main
+```
+
+在仓库目录中测试和构建。
+
 ```sh
 go test ./...
 go vet ./...
 go build .
 ```
 
-CI 在 Windows 和 Linux 上运行测试，并构建两个系统的 amd64 和 arm64 单文件程序。需要预编译版本时，登录 GitHub，在主分支一次成功的构建记录下下载 `gpuglint-binaries` 附件。解压后选择对应系统和架构的文件，Windows 上命名为 `gpuglint.exe`，Linux 上命名为 `gpuglint` 并运行 `chmod +x gpuglint`。[查看构建记录](https://github.com/lyingloong/gpuglint/actions/workflows/build.yml?query=branch%3Amain)
+CI 在 Windows 和 Linux 上运行测试，并构建两个系统的 amd64 和 arm64 单文件程序。将 `v1.2.3` 这类版本标签推送到 GitHub 后，CI 会在测试、构建和校验通过后自动发布这些文件及 `SHA256SUMS`。
